@@ -6,6 +6,9 @@ package main
 import "C"
 import (
 	"fmt"
+	"github.com/joho/godotenv"
+	"log"
+	"os"
 )
 
 type Stream struct {
@@ -21,7 +24,11 @@ type Context struct {
 }
 
 func main() {
-	stream := Stream{url: "test.mp4", camName: "Cam 1"}
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	stream := Stream{url: os.Getenv("TEST_CAM_URL"), camName: "Cam 1"}
 	stream.Open()
 	stream.Screen()
 	stream.Close()
