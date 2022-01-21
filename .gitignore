@@ -1,3 +1,5 @@
 .env
 .idea
 main
+*.mp4
+*.pgm
