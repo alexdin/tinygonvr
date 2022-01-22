@@ -101,6 +101,8 @@
     return 0;
 }
 
+
+ // @deprecated (moved to go)
  void read_context(AVCodecContext *codec_ctx, AVFormatContext *format_ctx) {
     printf("Start decode data\n");
     int response = 0;
@@ -132,3 +134,8 @@
      av_frame_free(&av_frame);
      av_packet_free(&av_packet);
 }
+
+ bool has_decode_error(int response)
+ {
+    return response == AVERROR(EAGAIN) || response == AVERROR_EOF;
+ }

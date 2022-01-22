@@ -2,6 +2,7 @@
 #include "libswscale/swscale.h"
 #include "libavcodec/avcodec.h"
 #include "libavformat/avformat.h"
+#include "stdbool.h"
 
  AVFormatContext* openStream(const char *filename);
 
@@ -14,3 +15,5 @@
  void save_gray_frame(unsigned char *buf, int wrap, int xsize, int ysize, char *filename);
 
  int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFrame *pFrame);
+
+ bool has_decode_error(int result);

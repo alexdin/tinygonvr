@@ -47,5 +47,36 @@ func (s *Stream) Close() {
 }
 
 func (s *Stream) Screen() {
-	C.read_context(s.context.AVCodecContext, s.context.AVFormatCtx)
+	//C.read_context(s.context.AVCodecContext, s.context.AVFormatCtx)
+	s.context.Read()
+}
+
+func (context *Context) Read() {
+	fmt.Println("Start on go lang encode")
+
+	avFrame := C.av_frame_alloc()
+	if avFrame == nil {
+		log.Fatal("Error alloc frame data")
+		os.Exit(0)
+	}
+	avPacket := C.av_packet_alloc()
+	if avPacket == nil {
+		log.Fatal("Error alloc packet data")
+		os.Exit(0)
+	}
+	var response C.int = 0
+	for i := 5; C.av_read_frame(context.AVFormatCtx, avPacket) >= 0 && i > 0; {
+
+		if avPacket.stream_index == 0 {
+			response = C.decode_packet(avPacket, context.AVCodecContext, avFrame)
+			if C.has_decode_error(response) {
+				continue
+			} else if response < 0 {
+				break
+			}
+			i--
+		}
+
+		C.av_packet_unref(avPacket)
+	}
 }
