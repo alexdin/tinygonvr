@@ -66,7 +66,6 @@ func (context *Context) Read() {
 	}
 	var response C.int = 0
 	for i := 5; C.av_read_frame(context.AVFormatCtx, avPacket) >= 0 && i > 0; {
-
 		if avPacket.stream_index == 0 {
 			response = C.decode_packet(avPacket, context.AVCodecContext, avFrame)
 			if C.has_decode_error(response) {
@@ -76,7 +75,8 @@ func (context *Context) Read() {
 			}
 			i--
 		}
-
 		C.av_packet_unref(avPacket)
 	}
+	C.av_frame_free(&avFrame)
+	C.av_packet_free(&avPacket)
 }
