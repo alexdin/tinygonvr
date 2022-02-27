@@ -6,13 +6,15 @@ package main
 import "C"
 import (
 	"fmt"
-	"github.com/joho/godotenv"
 	"log"
 	"os"
+
+	"github.com/joho/godotenv"
 )
 
 const CodecH264 string = "h264"
 const CodecH265 string = "h265"
+const outFileName string = "out.mp4"
 
 var supportedCodecs = [2]string{CodecH264, CodecH265}
 
@@ -69,33 +71,87 @@ func (context *Context) Read() {
 	}
 
 	if context.needTranscode() {
-		fmt.Println("Need transcode:\n" + CodecH265 + " codec detected")
+		fmt.Println("Need transcode:\n" + CodecH264 + " codec detected")
 	}
 
 	context.AVPacket.AVFrame = C.av_frame_alloc()
 	if context.AVPacket.AVFrame == nil {
 		log.Fatal("Error alloc frame data")
 	}
+
 	context.AVPacket.AVPacket = C.av_packet_alloc()
 	if context.AVPacket.AVPacket == nil {
 		log.Fatal("Error alloc packet data")
 	}
 
+	var outContext *C.AVFormatContext
+	var outStream *C.AVStream
+
+	C.avformat_alloc_output_context2(&outContext, nil, nil, C.CString(outFileName))
+	if outContext == nil {
+		log.Fatal("out fail initialize outContext")
+	}
+
+	outStream = C.avformat_new_stream(outContext, nil)
+	if outStream == nil {
+		log.Fatal("os stream")
+	}
+
+	// copy params
+	ret := C.avcodec_parameters_copy(outStream.codecpar, context.AVStream.codecpar)
+	if ret < 0 {
+		log.Fatal("Fail copy codec params")
+	}
+
+	outStream.codecpar.codec_tag = 0
+
+	// write format for outputfile
+	C.av_dump_format(outContext, 0, C.CString(outFileName), 1)
+
+	if C.avio_open(&outContext.pb, C.CString(outFileName), C.AVIO_FLAG_WRITE) < 0 {
+		log.Fatal("Could not open file for write")
+	}
+
+	if C.avformat_write_header(outContext, nil) < 0 {
+		log.Fatal("Could not write header data")
+	}
+
 	var response C.int = 0
-	for i := 5; C.av_read_frame(context.AVFormatCtx, context.AVPacket.AVPacket) >= 0 && i > 0; {
+	var seconds C.int = 5
+	var i C.int = 0
+
+	//	outStream.r_frame_rate = context.AVStream.r_frame_rate
+	for i = 0; C.av_read_frame(context.AVFormatCtx, context.AVPacket.AVPacket) >= 0 && i < context.AVStream.r_frame_rate.num*seconds; {
 
 		// check this is video stream (0) TODO refactor for true video check stream (not always 0 stream)
 		if context.AVPacket.AVPacket.stream_index == 0 {
-			response = C.decode_packet(context.AVPacket.AVPacket, context.AVCodecContext, context.AVPacket.AVFrame)
-			if C.has_decode_error(response) {
-				continue
-			} else if response < 0 {
-				break
+
+			fmt.Println(context.AVStream.time_base)
+			fmt.Println(outStream.time_base)
+			C.log_packet(context.AVFormatCtx, context.AVPacket.AVPacket, C.CString("in"))
+			/* copy packet */
+			//C.av_packet_rescale_ts(context.AVPacket.AVPacket, context.AVStream.time_base, outStream.time_base)
+			//context.AVPacket.AVPacket.pts = C.av_rescale_q_rnd(context.AVPacket.AVPacket.pts, context.AVStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|45000)
+			//context.AVPacket.AVPacket.dts = C.av_rescale_q_rnd(context.AVPacket.AVPacket.dts, context.AVStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|45000)
+			//	context.AVPacket.AVPacket.duration = C.av_rescale_q(context.AVPacket.AVPacket.duration, context.AVStream.time_base, outStream.time_base)
+			context.AVPacket.AVPacket.pos = -1
+			//	context.AVPacket.AVPacket.stream_index = 0
+
+			C.log_packet(context.AVFormatCtx, context.AVPacket.AVPacket, C.CString("out"))
+
+			// here video sream
+			response = C.av_interleaved_write_frame(outContext, context.AVPacket.AVPacket)
+			if response < 0 {
+				//log.Fatal("write file error")
+				//	break
 			}
-			i--
+			i++
+		} else {
+			C.av_packet_unref(context.AVPacket.AVPacket)
 		}
-		C.av_packet_unref(context.AVPacket.AVPacket)
+
 	}
+	C.av_write_trailer(outContext)
 	C.av_frame_free(&context.AVPacket.AVFrame)
 	C.av_packet_free(&context.AVPacket.AVPacket)
 }
