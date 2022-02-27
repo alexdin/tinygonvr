@@ -126,16 +126,18 @@ func (context *Context) Read() {
 		// check this is video stream (0) TODO refactor for true video check stream (not always 0 stream)
 		if context.AVPacket.AVPacket.stream_index == 0 {
 
-			fmt.Println(context.AVStream.time_base)
-			fmt.Println(outStream.time_base)
+			//	fmt.Println(context.AVStream.time_base)
+			//	fmt.Println(outStream.time_base)
 			C.log_packet(context.AVFormatCtx, context.AVPacket.AVPacket, C.CString("in"))
 			/* copy packet */
-			//C.av_packet_rescale_ts(context.AVPacket.AVPacket, context.AVStream.time_base, outStream.time_base)
-			//context.AVPacket.AVPacket.pts = C.av_rescale_q_rnd(context.AVPacket.AVPacket.pts, context.AVStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|45000)
-			//context.AVPacket.AVPacket.dts = C.av_rescale_q_rnd(context.AVPacket.AVPacket.dts, context.AVStream.time_base, outStream.time_base, C.AV_ROUND_NEAR_INF|45000)
-			//	context.AVPacket.AVPacket.duration = C.av_rescale_q(context.AVPacket.AVPacket.duration, context.AVStream.time_base, outStream.time_base)
 			context.AVPacket.AVPacket.pos = -1
-			//	context.AVPacket.AVPacket.stream_index = 0
+			context.AVPacket.AVPacket.stream_index = 0
+
+			// correct first packet
+			if context.AVPacket.AVPacket.dts > 0 && i == 0 {
+				context.AVPacket.AVPacket.dts = 0
+				context.AVPacket.AVPacket.pts = 0
+			}
 
 			C.log_packet(context.AVFormatCtx, context.AVPacket.AVPacket, C.CString("out"))
 
