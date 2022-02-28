@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"unsafe"
 
 	"github.com/joho/godotenv"
 )
@@ -29,6 +30,7 @@ type Context struct {
 	AVStream       *C.AVStream
 	AVCodecContext *C.AVCodecContext
 	AVPacket       Packet
+	VideoIndex     C.uint
 }
 
 type Packet struct {
@@ -50,8 +52,22 @@ func main() {
 
 func (s *Stream) Open() {
 	s.context.AVFormatCtx = C.openStream(C.CString(s.url))
-	s.context.AVStream = C.getVideoStream(s.context.AVFormatCtx)
+	s.context.AVStream, s.context.VideoIndex = getVideoStream(s.context.AVFormatCtx)
 	s.context.AVCodecContext = C.getCodec(s.context.AVStream)
+}
+
+func getVideoStream(ctx *C.AVFormatContext) (*C.AVStream, C.uint) {
+
+	streams := (*[1 << 30]*C.AVStream)(unsafe.Pointer(ctx.streams))
+	var stream *C.AVStream = nil
+	var i C.uint = 0
+	for i = 0; i < ctx.nb_streams; i++ {
+		if streams[i].codecpar.codec_type == C.AVMEDIA_TYPE_VIDEO {
+			stream = streams[i]
+			break
+		}
+	}
+	return stream, i
 }
 
 func (s *Stream) Close() {
@@ -124,14 +140,15 @@ func (context *Context) Read() {
 	for i = 0; C.av_read_frame(context.AVFormatCtx, context.AVPacket.AVPacket) >= 0 && i < context.AVStream.r_frame_rate.num*seconds; {
 
 		// check this is video stream (0) TODO refactor for true video check stream (not always 0 stream)
-		if context.AVPacket.AVPacket.stream_index == 0 {
+		if context.AVPacket.AVPacket.stream_index == C.int(context.VideoIndex) {
 
 			//	fmt.Println(context.AVStream.time_base)
 			//	fmt.Println(outStream.time_base)
 			C.log_packet(context.AVFormatCtx, context.AVPacket.AVPacket, C.CString("in"))
+
 			/* copy packet */
 			context.AVPacket.AVPacket.pos = -1
-			context.AVPacket.AVPacket.stream_index = 0
+			context.AVPacket.AVPacket.stream_index = C.int(context.VideoIndex)
 
 			// correct first packet
 			if context.AVPacket.AVPacket.dts > 0 && i == 0 {
