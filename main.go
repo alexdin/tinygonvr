@@ -53,7 +53,7 @@ func main() {
 func (s *Stream) Open() {
 	s.context.AVFormatCtx = C.openStream(C.CString(s.url))
 	s.context.AVStream, s.context.VideoIndex = getVideoStream(s.context.AVFormatCtx)
-	s.context.AVCodecContext = C.getCodec(s.context.AVStream)
+	s.context.AVCodecContext = getCodec(s.context.AVStream)
 }
 
 func getVideoStream(ctx *C.AVFormatContext) (*C.AVStream, C.uint) {
@@ -68,6 +68,24 @@ func getVideoStream(ctx *C.AVFormatContext) (*C.AVStream, C.uint) {
 		}
 	}
 	return stream, i
+}
+
+func getCodec(stream *C.AVStream) *C.AVCodecContext {
+	codec := C.avcodec_find_decoder(stream.codec.codec_id)
+	if codec == nil {
+		log.Fatal("Cant find codec")
+	}
+
+	codecCtx := C.avcodec_alloc_context3(codec)
+	if C.avcodec_parameters_to_context(codecCtx, stream.codecpar) < 0 {
+		log.Fatal("fail init params to codec")
+	}
+
+	if C.avcodec_open2(codecCtx, codec, nil) < 0 {
+		log.Fatal("Fatal avcodec_open2")
+	}
+
+	return codecCtx
 }
 
 func (s *Stream) Close() {
@@ -185,7 +203,7 @@ func (context *Context) canWatch() bool {
 			return true
 		}
 	}
-	return false
+	return true
 }
 
 func (context *Context) needTranscode() bool {
