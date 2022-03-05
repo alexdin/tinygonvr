@@ -1,6 +1,6 @@
 test:clean
 	clear
-	go build && ./main
+	go build && ./nvr
 	totem out.mp4
 
 clean:
