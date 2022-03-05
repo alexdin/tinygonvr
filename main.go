@@ -6,18 +6,27 @@ package main
 import "C"
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
-	"os"
 	"unsafe"
 
-	"github.com/joho/godotenv"
+	"gopkg.in/yaml.v2"
 )
 
 const CodecH264 string = "h264"
 const CodecH265 string = "h265"
-const outFileName string = "out.mp4"
 
 var supportedCodecs = [2]string{CodecH264, CodecH265}
+
+type Camera struct {
+	Url  string `yaml:"url"`
+	Name string `yaml:"name"`
+}
+
+type Config struct {
+	Debug bool
+	Cams  []Camera `yaml:"cams"`
+}
 
 type Stream struct {
 	url     string
@@ -39,15 +48,32 @@ type Packet struct {
 }
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	config := loadConfig()
+
+	for _, cam := range config.Cams {
+		stream := Stream{url: cam.Url, camName: cam.Name}
+		stream.Open()
+		stream.Screen()
+		stream.Close()
+
 	}
-	stream := Stream{url: os.Getenv("TEST_CAM_URL"), camName: "Cam 1"}
-	stream.Open()
-	stream.Screen()
-	stream.Close()
+
 	fmt.Println("Done")
+}
+
+func loadConfig() Config {
+	configBites, err := ioutil.ReadFile("config.yml")
+	if err != nil {
+
+		log.Fatal(err)
+	}
+	config := Config{}
+	err = yaml.Unmarshal(configBites, &config)
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+
+	return config
 }
 
 func (s *Stream) Open() {
@@ -95,10 +121,12 @@ func (s *Stream) Close() {
 
 func (s *Stream) Screen() {
 	//C.read_context(s.context.AVCodecContext, s.context.AVFormatCtx)
-	s.context.Read()
+	s.context.Read(s.camName)
 }
 
-func (context *Context) Read() {
+func (context *Context) Read(outFileName string) {
+
+	outFileName = outFileName + ".mp4"
 
 	if !context.canWatch() {
 		log.Fatal("Video codec of stream not support")

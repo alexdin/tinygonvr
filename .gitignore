@@ -3,3 +3,4 @@
 main
 *.mp4
 *.pgm
+config.yml
