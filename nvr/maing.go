@@ -6,10 +6,9 @@ package main
 import "C"
 import (
 	"fmt"
+	notifyer "github.com/alexdin/tinygonvr/notifyer"
 	"io/ioutil"
 	"log"
-
-	"github.com/alexdin/tinygonvr/ffmpeg"
 
 	"gopkg.in/yaml.v2"
 )
@@ -20,8 +19,14 @@ type Camera struct {
 }
 
 type Config struct {
-	Debug bool
-	Cams  []Camera `yaml:"cams"`
+	Debug  bool
+	Cams   []Camera `yaml:"cams"`
+	Notify Notify   `yaml:"notify"`
+}
+
+type Notify struct {
+	BotToken  string `yaml:"botToken"`
+	ChannelId int    `yaml:"channelId"`
 }
 
 func main() {
@@ -29,14 +34,22 @@ func main() {
 	config := loadConfig()
 
 	for _, cam := range config.Cams {
-		stream := ffmpeg.Stream{Url: cam.Url, CamName: cam.Name}
-		stream.Open()
-		stream.Screen()
-		stream.Close()
+		fmt.Println(cam)
+		/*	stream := ffmpeg.Stream{Url: cam.Url, CamName: cam.Name}
+			stream.Open()
+			stream.Screen()
+			stream.Close()*/
 
 	}
 
 	fmt.Println("Done")
+	notifyer.Boot(
+		notifyer.Notify{
+			BotType:   notifyer.ChannelTelegram,
+			BotToken:  config.Notify.BotToken,
+			ChannelId: config.Notify.ChannelId,
+		},
+	)
 }
 
 func loadConfig() Config {
