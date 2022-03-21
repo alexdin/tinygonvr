@@ -2,37 +2,23 @@ package main
 
 // #cgo pkg-config: libavcodec libavutil libavformat libswscale
 // #cgo CFLAGS: -std=c11 -g
-// #include "ffmpeg.h"
+// #include "../ffmpeg/ffmpeg.h"
 import "C"
 import (
 	"fmt"
-	notifyer "github.com/alexdin/tinygonvr/notifyer"
+	"github.com/alexdin/tinygonvr/alarm"
 	"io/ioutil"
 	"log"
 
 	"gopkg.in/yaml.v2"
 )
 
-type Camera struct {
-	Url  string `yaml:"url"`
-	Name string `yaml:"name"`
-}
-
-type Config struct {
-	Debug  bool
-	Cams   []Camera `yaml:"cams"`
-	Notify Notify   `yaml:"notify"`
-}
-
-type Notify struct {
-	BotToken  string `yaml:"botToken"`
-	ChannelId int    `yaml:"channelId"`
-}
-
 func main() {
 
+	// load config data
 	config := loadConfig()
-
+	// boot config alert monitoring
+	alarm.Boot(config.getAlertConfig())
 	for _, cam := range config.Cams {
 		fmt.Println(cam)
 		/*	stream := ffmpeg.Stream{Url: cam.Url, CamName: cam.Name}
@@ -43,13 +29,13 @@ func main() {
 	}
 
 	fmt.Println("Done")
-	notifyer.Boot(
-		notifyer.Notify{
-			BotType:   notifyer.ChannelTelegram,
-			BotToken:  config.Notify.BotToken,
-			ChannelId: config.Notify.ChannelId,
-		},
-	)
+	//notifyer.Boot(
+	//	notifyer.Notify{
+	//		BotType:   notifyer.ChannelTelegram,
+	//		BotToken:  config.Notify.BotToken,
+	//		ChannelId: config.Notify.ChannelId,
+	//	},
+	//)
 }
 
 func loadConfig() Config {
