@@ -16,9 +16,10 @@ const CodecH265 string = "h265"
 var supportedCodecs = [2]string{CodecH264, CodecH265}
 
 type Stream struct {
-	Url     string
-	CamName string
-	Context Context
+	Url          string
+	CamName      string
+	Context      Context
+	AlarmChannel chan int
 }
 
 type Context struct {
@@ -78,11 +79,10 @@ func (s *Stream) Close() {
 }
 
 func (s *Stream) Screen() {
-	//C.read_context(s.Context.AVCodecContext, s.Context.AVFormatCtx)
-	s.Context.Read(s.CamName)
+	s.Context.WriteVideoFile(s.CamName)
 }
 
-func (context *Context) Read(outFileName string) {
+func (context *Context) WriteVideoFile(outFileName string) {
 
 	outFileName = outFileName + ".mp4"
 
@@ -125,7 +125,7 @@ func (context *Context) Read(outFileName string) {
 
 	outStream.codecpar.codec_tag = 0
 
-	// write format for outputfile
+	// write format for output file
 	C.av_dump_format(outContext, 0, C.CString(outFileName), 1)
 
 	if C.avio_open(&outContext.pb, C.CString(outFileName), C.AVIO_FLAG_WRITE) < 0 {
@@ -143,7 +143,6 @@ func (context *Context) Read(outFileName string) {
 	//	outStream.r_frame_rate = context.AVStream.r_frame_rate
 	for i = 0; C.av_read_frame(context.AVFormatCtx, context.AVPacket.AVPacket) >= 0 && i < context.AVStream.r_frame_rate.num*seconds; {
 
-		// check this is video stream (0) TODO refactor for true video check stream (not always 0 stream)
 		if context.AVPacket.AVPacket.stream_index == C.int(context.VideoIndex) {
 
 			//	fmt.Println(context.AVStream.time_base)
@@ -162,7 +161,7 @@ func (context *Context) Read(outFileName string) {
 
 			C.log_packet(context.AVFormatCtx, context.AVPacket.AVPacket, C.CString("out"))
 
-			// here video sream
+			// here video stream
 			response = C.av_interleaved_write_frame(outContext, context.AVPacket.AVPacket)
 			if response < 0 {
 				//log.Fatal("write file error")

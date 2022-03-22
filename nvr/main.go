@@ -7,6 +7,7 @@ import "C"
 import (
 	"fmt"
 	"github.com/alexdin/tinygonvr/alarm"
+	"github.com/alexdin/tinygonvr/ffmpeg"
 	"io/ioutil"
 	"log"
 
@@ -21,10 +22,10 @@ func main() {
 	alarm.Boot(config.getAlertConfig())
 	for _, cam := range config.Cams {
 		fmt.Println(cam)
-		/*	stream := ffmpeg.Stream{Url: cam.Url, CamName: cam.Name}
-			stream.Open()
-			stream.Screen()
-			stream.Close()*/
+		stream := ffmpeg.Stream{Url: cam.Url, CamName: cam.Name}
+		stream.Open()
+		stream.Screen()
+		stream.Close()
 
 	}
 

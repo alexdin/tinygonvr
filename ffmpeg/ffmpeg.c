@@ -103,38 +103,7 @@
 }
 
 
- // @deprecated (moved to go)
- void read_context(AVCodecContext *codec_ctx, AVFormatContext *format_ctx) {
-    printf("Start decode data\n");
-    int response = 0;
-    int fi = 5;
-    AVFrame *av_frame = av_frame_alloc();
-    if (!av_frame) {
-        exit(1);
-    }
-    AVPacket *av_packet = av_packet_alloc();
-    if (!av_packet) {
-        exit(1);
-    }
-    //av_read_play(format_ctx);
 
-    while (av_read_frame(format_ctx, av_packet) >= 0) {
-        // if it's the video stream
-        if (av_packet->stream_index == 0) {
-            response = decode_packet(av_packet, codec_ctx, av_frame);
-            if (response == AVERROR(EAGAIN) || response == AVERROR_EOF) {
-                continue;
-            } else if (response < 0)
-                break;
-            // stop it, otherwise we'll be saving hundreds of frames
-            if (--fi <= 0) break;
-        }
-        // https://ffmpeg.org/doxygen/trunk/group__lavc__packet.html#ga63d5a489b419bd5d45cfd09091cbcbc2
-        av_packet_unref(av_packet);
-    }
-     av_frame_free(&av_frame);
-     av_packet_free(&av_packet);
-}
 
  bool has_decode_error(int response)
  {

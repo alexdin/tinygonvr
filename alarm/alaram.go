@@ -2,6 +2,7 @@ package alarm
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"os/signal"
 	"sync"
@@ -37,6 +38,14 @@ func Boot(config []Cam) {
 	handleAlert([]byte(s))
 }
 
+func (a *Alarm) getCamChannelByIndex(index int) <-chan int {
+	for _, v := range a.cams {
+		if v.index == index {
+			return v.channel
+		}
+	}
+}
+
 func GetAlarm() Alarm {
 	return alarm
 }
@@ -61,12 +70,14 @@ func handleAlert(data []byte) {
 	message := Message{}
 	err := json.Unmarshal(data, &message)
 	if err != nil {
+		log.Fatal(err)
 		return
 	}
 	if message.Status == "Start" && message.Event == "HumanDetect" && message.Type == "Alarm" {
 		for _, val := range alarm.cams {
 			if val.ip == hexIpToCIDR(message.Address) {
 				val.channel <- val.index
+				return
 			}
 		}
 	}
