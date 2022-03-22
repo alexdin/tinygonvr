@@ -19,16 +19,8 @@ func main() {
 	// load config data
 	config := loadConfig()
 	// boot config alert monitoring
-	alarm.Boot(config.getAlertConfig())
-	for _, cam := range config.Cams {
-		fmt.Println(cam)
-		stream := ffmpeg.Stream{Url: cam.Url, CamName: cam.Name}
-		stream.Open()
-		stream.Screen()
-		stream.Close()
-
-	}
-
+	go alarm.Boot(config.getAlertConfig())
+	ffmpeg.Boot(config.getFFmpegConfig())
 	fmt.Println("Done")
 	//notifyer.Boot(
 	//	notifyer.Notify{

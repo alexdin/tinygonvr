@@ -77,7 +77,7 @@ func handleAlert(data []byte) {
 	if message.Status == "Start" && message.Event == "HumanDetect" && message.Type == "Alarm" {
 		for _, val := range alarm.cams {
 			if val.ip == hexIpToCIDR(message.Address) {
-				val.channel <- val.index
+				val.channel <- 1
 				return
 			}
 		}

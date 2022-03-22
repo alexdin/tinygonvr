@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/alexdin/tinygonvr/alarm"
+	"github.com/alexdin/tinygonvr/ffmpeg"
 	"net"
 	"net/url"
 )
@@ -26,6 +27,14 @@ func (c *Config) getAlertConfig() []alarm.Cam {
 	var slice []alarm.Cam
 	for index, val := range c.Cams {
 		slice = append(slice, alarm.NewCam(index, getIpFromUrl(val.Url)))
+	}
+	return slice
+}
+
+func (c *Config) getFFmpegConfig() []ffmpeg.Stream {
+	var slice []ffmpeg.Stream
+	for _, val := range c.Cams {
+		slice = append(slice, ffmpeg.Stream{Url: val.Url, CamName: val.Name})
 	}
 	return slice
 }

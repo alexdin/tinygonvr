@@ -6,6 +6,7 @@ package ffmpeg
 import "C"
 import (
 	"fmt"
+	"github.com/alexdin/tinygonvr/alarm"
 	"log"
 	"unsafe"
 )
@@ -16,10 +17,9 @@ const CodecH265 string = "h265"
 var supportedCodecs = [2]string{CodecH264, CodecH265}
 
 type Stream struct {
-	Url          string
-	CamName      string
-	Context      Context
-	AlarmChannel chan int
+	Url     string
+	CamName string
+	Context Context
 }
 
 type Context struct {
@@ -33,6 +33,14 @@ type Context struct {
 type Packet struct {
 	AVPacket *C.AVPacket
 	AVFrame  *C.AVFrame
+}
+
+func Boot(config []Stream) {
+	for i, stream := range config {
+		stream.Open()
+		stream.Screen(i)
+		stream.Close()
+	}
 }
 
 func (s *Stream) Open() {
@@ -78,8 +86,9 @@ func (s *Stream) Close() {
 	C.avcodec_free_context(&s.Context.AVCodecContext)
 }
 
-func (s *Stream) Screen() {
-	s.Context.WriteVideoFile(s.CamName)
+func (s *Stream) Screen(index int) {
+	//s.Context.WriteVideoFile(s.CamName)
+	s.Context.WaitForAlarm(index)
 }
 
 func (context *Context) WriteVideoFile(outFileName string) {
@@ -92,11 +101,6 @@ func (context *Context) WriteVideoFile(outFileName string) {
 
 	if context.needTranscode() {
 		fmt.Println("Need transcode:\n" + CodecH264 + " codec detected")
-	}
-
-	context.AVPacket.AVFrame = C.av_frame_alloc()
-	if context.AVPacket.AVFrame == nil {
-		log.Fatal("Error alloc frame data")
 	}
 
 	context.AVPacket.AVPacket = C.av_packet_alloc()
@@ -159,7 +163,7 @@ func (context *Context) WriteVideoFile(outFileName string) {
 				context.AVPacket.AVPacket.pts = 0
 			}
 
-			C.log_packet(context.AVFormatCtx, context.AVPacket.AVPacket, C.CString("out"))
+			//C.log_packet(context.AVFormatCtx, context.AVPacket.AVPacket, C.CString("out"))
 
 			// here video stream
 			response = C.av_interleaved_write_frame(outContext, context.AVPacket.AVPacket)
@@ -174,6 +178,34 @@ func (context *Context) WriteVideoFile(outFileName string) {
 
 	}
 	C.av_write_trailer(outContext)
+	C.av_packet_free(&context.AVPacket.AVPacket)
+}
+
+func (context *Context) WaitForAlarm(index int) {
+	context.AVPacket.AVFrame = C.av_frame_alloc()
+	if context.AVPacket.AVFrame == nil {
+		log.Fatal("Error alloc frame data")
+	}
+
+	context.AVPacket.AVPacket = C.av_packet_alloc()
+	if context.AVPacket.AVPacket == nil {
+		log.Fatal("Error alloc packet data")
+	}
+
+	for C.av_read_frame(context.AVFormatCtx, context.AVPacket.AVPacket) >= 0 {
+		if context.AVPacket.AVPacket.stream_index == C.int(context.VideoIndex) && C.avcodec_send_packet(context.AVCodecContext, context.AVPacket.AVPacket) >= 0 {
+			for response := C.avcodec_receive_frame(context.AVCodecContext, context.AVPacket.AVFrame); !C.has_decode_error(response); {
+				if isAlarm(index) {
+					log.Fatal("alarm")
+				} else {
+					fmt.Println(".")
+				}
+			}
+		} else {
+			C.av_packet_unref(context.AVPacket.AVPacket)
+		}
+	}
+
 	C.av_frame_free(&context.AVPacket.AVFrame)
 	C.av_packet_free(&context.AVPacket.AVPacket)
 }
@@ -193,4 +225,10 @@ func (context *Context) canWatch() bool {
 
 func (context *Context) needTranscode() bool {
 	return CodecH264 == C.GoString(context.AVCodecContext.codec.name)
+}
+
+func isAlarm(index int) bool {
+	conf := alarm.GetAlarm()
+	outChan := conf.GetCamChannelByIndex(index)
+	return len(outChan) != 0
 }
