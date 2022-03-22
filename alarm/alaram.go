@@ -38,12 +38,13 @@ func Boot(config []Cam) {
 	handleAlert([]byte(s))
 }
 
-func (a *Alarm) getCamChannelByIndex(index int) <-chan int {
+func (a *Alarm) GetCamChannelByIndex(index int) <-chan int {
 	for _, v := range a.cams {
 		if v.index == index {
 			return v.channel
 		}
 	}
+	return nil
 }
 
 func GetAlarm() Alarm {
