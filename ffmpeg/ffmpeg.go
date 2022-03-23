@@ -230,5 +230,14 @@ func (context *Context) needTranscode() bool {
 func isAlarm(index int) bool {
 	conf := alarm.GetAlarm()
 	outChan := conf.GetCamChannelByIndex(index)
-	return len(outChan) != 0
+	select {
+	case _, ok := <-outChan:
+		if ok {
+			return true
+		} else {
+			return false
+		}
+	default:
+		return false
+	}
 }
