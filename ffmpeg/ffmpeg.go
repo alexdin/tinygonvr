@@ -7,7 +7,12 @@ import "C"
 import (
 	"fmt"
 	"github.com/alexdin/tinygonvr/alarm"
+	"image"
+	"image/jpeg"
+	_ "image/jpeg"
 	"log"
+	"math"
+	"os"
 	"unsafe"
 )
 
@@ -195,7 +200,9 @@ func (context *Context) WaitForAlarm(index int) {
 	for C.av_read_frame(context.AVFormatCtx, context.AVPacket.AVPacket) >= 0 {
 		if context.AVPacket.AVPacket.stream_index == C.int(context.VideoIndex) && C.avcodec_send_packet(context.AVCodecContext, context.AVPacket.AVPacket) >= 0 {
 			for response := C.avcodec_receive_frame(context.AVCodecContext, context.AVPacket.AVFrame); !C.has_decode_error(response); {
+
 				if isAlarm(index) {
+					ffmpegFrameToRGBImage(context.AVPacket.AVFrame)
 					log.Fatal("alarm")
 				} else {
 					fmt.Println(".")
@@ -212,6 +219,34 @@ func (context *Context) WaitForAlarm(index int) {
 
 func (context *Context) decodePacket() {
 
+}
+
+func ffmpegFrameToRGBImage(frame *C.AVFrame) {
+	width := int(frame.width)
+	height := int(frame.height)
+	//wrap := int(height)
+	//hwrap := wrap / 2
+	imageObj := image.NewYCbCr(image.Rect(0, 0, width, height), image.YCbCrSubsampleRatio420)
+	yData := C.GoBytes(unsafe.Pointer(frame.data[0]), C.int(width*height))
+	uData := C.GoBytes(unsafe.Pointer(frame.data[1]), C.int(width*height/2))
+	vData := C.GoBytes(unsafe.Pointer(frame.data[2]), C.int(width*height/2))
+	imageObj.Y = yData
+	imageObj.Cb = uData
+	imageObj.Cr = vData
+
+	fmt.Println(imageObj.YStride)
+
+	f, _ := os.Create("test.jpg")
+	err := jpeg.Encode(f, imageObj, &jpeg.Options{100})
+	if err != nil {
+		return
+	}
+	log.Fatal("done")
+
+}
+
+func clamp(v float64, lo, hi uint8) uint8 {
+	return uint8(math.Min(math.Max(v, float64(lo)), float64(hi)))
 }
 
 func (context *Context) canWatch() bool {
