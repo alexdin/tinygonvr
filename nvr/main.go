@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/alexdin/tinygonvr/alarm"
 	"github.com/alexdin/tinygonvr/ffmpeg"
+	"github.com/alexdin/tinygonvr/notifyer"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
@@ -20,16 +21,18 @@ func main() {
 
 	// boot config alert monitoring
 	go alarm.Boot(config.getAlertConfig())
+	go notifyer.Boot(
+		notifyer.Notify{
+			BotType:   notifyer.ChannelTelegram,
+			BotToken:  config.Notify.BotToken,
+			ChannelId: config.Notify.ChannelId,
+			PhotoChan: make(chan []byte),
+		},
+	)
 
 	ffmpeg.Boot(config.getFFmpegConfig())
-	//notifyer.Boot(
-	//	notifyer.Notify{
-	//		BotType:   notifyer.ChannelTelegram,
-	//		BotToken:  config.Notify.BotToken,
-	//		ChannelId: config.Notify.ChannelId,
-	//	},
-	//)
-	fmt.Println("Done")
+
+	fmt.Println("Done.")
 }
 
 func loadConfig() Config {

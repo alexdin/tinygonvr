@@ -5,14 +5,15 @@ package ffmpeg
 // #include "ffmpeg.h"
 import "C"
 import (
+	"bytes"
 	"fmt"
 	"github.com/alexdin/tinygonvr/alarm"
+	"github.com/alexdin/tinygonvr/notifyer"
 	"image"
 	"image/jpeg"
 	_ "image/jpeg"
 	"log"
 	"math"
-	"os"
 	"unsafe"
 )
 
@@ -200,12 +201,9 @@ func (context *Context) WaitForAlarm(index int) {
 	for C.av_read_frame(context.AVFormatCtx, context.AVPacket.AVPacket) >= 0 {
 		if context.AVPacket.AVPacket.stream_index == C.int(context.VideoIndex) && C.avcodec_send_packet(context.AVCodecContext, context.AVPacket.AVPacket) >= 0 {
 			for response := C.avcodec_receive_frame(context.AVCodecContext, context.AVPacket.AVFrame); !C.has_decode_error(response); {
-
 				if isAlarm(index) {
-					ffmpegFrameToRGBImage(context.AVPacket.AVFrame)
-					log.Fatal("alarm")
-				} else {
-					fmt.Println(".")
+					photo := context.ffmpegFrameToByte()
+					notifyer.PutPhotoToChannel(photo)
 				}
 			}
 		} else {
@@ -221,28 +219,33 @@ func (context *Context) decodePacket() {
 
 }
 
-func ffmpegFrameToRGBImage(frame *C.AVFrame) {
+func (context *Context) ffmpegFrameToByte() []byte {
+	frame := context.AVPacket.AVFrame
+
 	width := int(frame.width)
 	height := int(frame.height)
-	//wrap := int(height)
-	//hwrap := wrap / 2
+
 	imageObj := image.NewYCbCr(image.Rect(0, 0, width, height), image.YCbCrSubsampleRatio420)
-	yData := C.GoBytes(unsafe.Pointer(frame.data[0]), C.int(width*height))
-	uData := C.GoBytes(unsafe.Pointer(frame.data[1]), C.int(width*height/2))
-	vData := C.GoBytes(unsafe.Pointer(frame.data[2]), C.int(width*height/2))
+
+	length := width * height
+	hlength := length / 2
+
+	// load from ffmpeg struct
+	yData := C.GoBytes(unsafe.Pointer(frame.data[0]), C.int(length))
+	uData := C.GoBytes(unsafe.Pointer(frame.data[1]), C.int(hlength))
+	vData := C.GoBytes(unsafe.Pointer(frame.data[2]), C.int(hlength))
+
+	// load to image obj
 	imageObj.Y = yData
 	imageObj.Cb = uData
 	imageObj.Cr = vData
 
-	fmt.Println(imageObj.YStride)
-
-	f, _ := os.Create("test.jpg")
-	err := jpeg.Encode(f, imageObj, &jpeg.Options{100})
+	buf := new(bytes.Buffer)
+	err := jpeg.Encode(buf, imageObj, nil)
 	if err != nil {
-		return
+		log.Fatal("error image encode")
 	}
-	log.Fatal("done")
-
+	return buf.Bytes()
 }
 
 func clamp(v float64, lo, hi uint8) uint8 {

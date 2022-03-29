@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
 )
@@ -18,10 +19,15 @@ func (b *Bot) Boot(botToken string) {
 	bot.Debug = false
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
+	b.bot = bot
+	go b.Watch()
+}
+
+func (b *Bot) Watch() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
-	updates := bot.GetUpdatesChan(u)
+	updates := b.bot.GetUpdatesChan(u)
 
 	for update := range updates {
 		if update.Message != nil { // If we got a message
@@ -30,17 +36,29 @@ func (b *Bot) Boot(botToken string) {
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 			msg.ReplyToMessageID = update.Message.MessageID
 
-			bot.Send(msg)
+			b.bot.Send(msg)
 		}
 	}
-
-	b.bot = bot
 }
 
-func (b *Bot) SendPhotoAlarm() bool {
+func (b *Bot) SendPhotoAlarm(bytesData []byte) bool {
+	fmt.Println(len(bytesData))
 
+	photoFileBytes := tgbotapi.FileBytes{
+		Name:  "picture",
+		Bytes: bytesData,
+	}
+
+	photoMessage := tgbotapi.NewPhoto(int64(-1001317502508), photoFileBytes)
+	photoMessage.File = photoFileBytes
+
+	_, err := b.bot.Send(photoMessage)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return true
 }
+
 func (b *Bot) SendVideoAlarm() bool {
 	return true
 }

@@ -1,10 +1,12 @@
 package notifyer
 
-import "github.com/alexdin/tinygonvr/notifyer/telegram"
+import (
+	"github.com/alexdin/tinygonvr/notifyer/telegram"
+)
 
 type NotifyTransfer interface {
 	Boot(string)
-	SendPhotoAlarm() bool
+	SendPhotoAlarm([]byte) bool
 	SendVideoAlarm() bool
 }
 
@@ -12,6 +14,7 @@ type Notify struct {
 	BotToken  string
 	ChannelId int
 	BotType   int
+	PhotoChan chan []byte
 }
 
 var botInstance NotifyTransfer = nil
@@ -21,7 +24,6 @@ var config Notify
 const ChannelTelegram = 0
 
 func Boot(notify Notify) {
-
 	config = notify
 	switch config.BotType {
 	case ChannelTelegram:
@@ -29,5 +31,13 @@ func Boot(notify Notify) {
 	}
 
 	botInstance.Boot(config.BotToken)
+	go waitForPhoto()
+}
 
+func waitForPhoto() {
+	botInstance.SendPhotoAlarm(<-config.PhotoChan)
+}
+
+func PutPhotoToChannel(data []byte) {
+	config.PhotoChan <- data
 }
