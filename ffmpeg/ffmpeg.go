@@ -13,7 +13,6 @@ import (
 	"image/jpeg"
 	_ "image/jpeg"
 	"log"
-	"math"
 	"unsafe"
 )
 
@@ -41,6 +40,10 @@ type Packet struct {
 	AVFrame  *C.AVFrame
 }
 
+type Error struct {
+	err string
+}
+
 func Boot(config []Stream) {
 	for i, stream := range config {
 		stream.Open()
@@ -53,6 +56,10 @@ func (s *Stream) Open() {
 	s.Context.AVFormatCtx = C.openStream(C.CString(s.Url))
 	s.Context.AVStream, s.Context.VideoIndex = getVideoStream(s.Context.AVFormatCtx)
 	s.Context.AVCodecContext = getCodec(s.Context.AVStream)
+}
+
+func (e *Error) Error() string {
+	return e.err
 }
 
 func getVideoStream(ctx *C.AVFormatContext) (*C.AVStream, C.uint) {
@@ -198,12 +205,20 @@ func (context *Context) WaitForAlarm(index int) {
 		log.Fatal("Error alloc packet data")
 	}
 
+	var needReparse = false
+
 	for C.av_read_frame(context.AVFormatCtx, context.AVPacket.AVPacket) >= 0 {
 		if context.AVPacket.AVPacket.stream_index == C.int(context.VideoIndex) && C.avcodec_send_packet(context.AVCodecContext, context.AVPacket.AVPacket) >= 0 {
 			for response := C.avcodec_receive_frame(context.AVCodecContext, context.AVPacket.AVFrame); !C.has_decode_error(response); {
-				if isAlarm(index) {
-					photo := context.ffmpegFrameToByte()
-					notifyer.PutPhotoToChannel(photo)
+				if isAlarm(index) || needReparse {
+					photo, perr := context.ffmpegFrameToByte()
+					if perr != nil {
+						needReparse = true
+					} else {
+						notifyer.PutPhotoToChannel(photo)
+						needReparse = false
+					}
+
 				}
 			}
 		} else {
@@ -215,15 +230,17 @@ func (context *Context) WaitForAlarm(index int) {
 	C.av_packet_free(&context.AVPacket.AVPacket)
 }
 
-func (context *Context) decodePacket() {
-
-}
-
-func (context *Context) ffmpegFrameToByte() []byte {
+func (context *Context) ffmpegFrameToByte() ([]byte, error) {
 	frame := context.AVPacket.AVFrame
 
 	width := int(frame.width)
 	height := int(frame.height)
+
+	buf := new(bytes.Buffer)
+
+	if width != int(frame.linesize[0]) || width != 2*int(frame.linesize[1]) || width != 2*int(frame.linesize[2]) {
+		return buf.Bytes(), &Error{err: "Bad sizes"}
+	}
 
 	imageObj := image.NewYCbCr(image.Rect(0, 0, width, height), image.YCbCrSubsampleRatio420)
 
@@ -240,16 +257,12 @@ func (context *Context) ffmpegFrameToByte() []byte {
 	imageObj.Cb = uData
 	imageObj.Cr = vData
 
-	buf := new(bytes.Buffer)
-	err := jpeg.Encode(buf, imageObj, nil)
+	options := jpeg.Options{Quality: 100}
+	err := jpeg.Encode(buf, imageObj, &options)
 	if err != nil {
 		log.Fatal("error image encode")
 	}
-	return buf.Bytes()
-}
-
-func clamp(v float64, lo, hi uint8) uint8 {
-	return uint8(math.Min(math.Max(v, float64(lo)), float64(hi)))
+	return buf.Bytes(), nil
 }
 
 func (context *Context) canWatch() bool {
