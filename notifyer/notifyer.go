@@ -35,7 +35,10 @@ func Boot(notify Notify) {
 }
 
 func waitForPhoto() {
-	botInstance.SendPhotoAlarm(<-config.PhotoChan)
+	for {
+		botInstance.SendPhotoAlarm(<-config.PhotoChan)
+	}
+
 }
 
 func PutPhotoToChannel(data []byte) {
